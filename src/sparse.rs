@@ -1,11 +1,20 @@
-use crate::{bitvec::BitVec, intvec::IntVec, dense64::Dense64, set::ImpliedSet, rank::Rank, select::Select, select::Select0};
+use crate::{
+    bitvec::BitVec,
+    dense64::Dense64,
+    intvec::IntVec,
+    persist::{load_usize, Persistent},
+    rank::Rank,
+    select::Select,
+    select::Select0,
+    set::ImpliedSet,
+};
 
 pub struct Sparse {
     b: usize,
     n: usize,
     d: usize,
     hi: Dense64,
-    lo: IntVec
+    lo: IntVec,
 }
 
 impl Sparse {
@@ -26,7 +35,13 @@ impl Sparse {
             low_bits.push(lo);
         }
         hi_bits.push(true);
-        Sparse { b, n, d, hi: Dense64::new(hi_bits.len() as u64, hi_bits.as_words()), lo: low_bits }
+        Sparse {
+            b,
+            n,
+            d,
+            hi: Dense64::new(hi_bits.len() as u64, hi_bits.as_words()),
+            lo: low_bits,
+        }
     }
 }
 
@@ -61,8 +76,40 @@ impl Select for Sparse {
     fn select(&self, index: usize) -> u64 {
         let z = self.hi.select_0(index);
         let hi = self.hi.rank(z) as u64 - 1;
-        println!("index={}, z={}, hi={}, lo={}", index, z, hi, self.lo.get(index));
+        println!(
+            "index={}, z={}, hi={}, lo={}",
+            index,
+            z,
+            hi,
+            self.lo.get(index)
+        );
         (hi << self.d) | self.lo.get(index)
+    }
+}
+
+impl Persistent for Sparse {
+    fn save<Sink>(&self, sink: &mut Sink) -> std::io::Result<()>
+    where
+        Sink: std::io::Write,
+    {
+        sink.write_all(&self.b.to_ne_bytes())?;
+        sink.write_all(&self.n.to_ne_bytes())?;
+        sink.write_all(&self.d.to_ne_bytes())?;
+        self.hi.save(sink)?;
+        self.lo.save(sink)?;
+        Ok(())
+    }
+
+    fn load<Source>(source: &mut Source) -> std::io::Result<Box<Self>>
+    where
+        Source: std::io::Read,
+    {
+        let b: usize = load_usize(source)?;
+        let n: usize = load_usize(source)?;
+        let d: usize = load_usize(source)?;
+        let hi: Dense64 = *(Dense64::load(source)?);
+        let lo: IntVec = *(IntVec::load(source)?);
+        Ok(Box::new(Sparse { b, n, d, hi, lo }))
     }
 }
 

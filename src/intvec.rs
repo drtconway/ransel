@@ -1,3 +1,9 @@
+use std::io::{Error, ErrorKind};
+
+use crate::persist::{
+    load_usize, load_vec_u16, load_vec_u32, load_vec_u64, load_vec_u8, save_vec, Persistent,
+};
+
 enum Integers {
     U8(Vec<u8>),
     U16(Vec<u16>),
@@ -66,24 +72,12 @@ impl IntVec {
 
     pub fn len(&self) -> usize {
         match &self.items {
-            Integers::U8(vec) => {
-                vec.len()
-            }
-            Integers::U16(vec) => {
-                vec.len()
-            }
-            Integers::U24(hi, _low) => {
-                hi.len()
-            }
-            Integers::U32(vec) => {
-                vec.len()
-            }
-            Integers::U48(hi, _low) => {
-                hi.len()
-            }
-            Integers::U64(vec) => {
-                vec.len()
-            }
+            Integers::U8(vec) => vec.len(),
+            Integers::U16(vec) => vec.len(),
+            Integers::U24(hi, _low) => hi.len(),
+            Integers::U32(vec) => vec.len(),
+            Integers::U48(hi, _low) => hi.len(),
+            Integers::U64(vec) => vec.len(),
         }
     }
 
@@ -170,6 +164,100 @@ impl IntVec {
             Integers::U64(vec) => {
                 vec[index] = x;
             }
+        }
+    }
+}
+
+impl Persistent for IntVec {
+    fn save<Sink>(&self, sink: &mut Sink) -> std::io::Result<()>
+    where
+        Sink: std::io::Write,
+    {
+        match &self.items {
+            Integers::U8(vec) => {
+                let fmt: usize = 8;
+                sink.write_all(&fmt.to_ne_bytes())?;
+                save_vec(sink, vec)?;
+            }
+            Integers::U16(vec) => {
+                let fmt: usize = 16;
+                sink.write_all(&fmt.to_ne_bytes())?;
+                save_vec(sink, vec)?;
+            }
+            Integers::U24(hi, low) => {
+                let fmt: usize = 24;
+                sink.write_all(&fmt.to_ne_bytes())?;
+                save_vec(sink, hi)?;
+                save_vec(sink, low)?;
+            }
+            Integers::U32(vec) => {
+                let fmt: usize = 32;
+                sink.write_all(&fmt.to_ne_bytes())?;
+                save_vec(sink, vec)?;
+            }
+            Integers::U48(hi, low) => {
+                let fmt: usize = 48;
+                sink.write_all(&fmt.to_ne_bytes())?;
+                save_vec(sink, hi)?;
+                save_vec(sink, low)?;
+            }
+            Integers::U64(vec) => {
+                let fmt: usize = 64;
+                sink.write_all(&fmt.to_ne_bytes())?;
+                save_vec(sink, vec)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn load<Source>(source: &mut Source) -> std::io::Result<Box<Self>>
+    where
+        Source: std::io::Read,
+    {
+        let z = load_usize(source)?;
+        match z {
+            8 => {
+                let vec: Vec<u8> = load_vec_u8(source)?;
+                Ok(Box::new(IntVec {
+                    items: Integers::U8(vec),
+                }))
+            }
+            16 => {
+                let vec: Vec<u16> = load_vec_u16(source)?;
+                Ok(Box::new(IntVec {
+                    items: Integers::U16(vec),
+                }))
+            }
+            24 => {
+                let hi: Vec<u8> = load_vec_u8(source)?;
+                let low: Vec<u16> = load_vec_u16(source)?;
+                Ok(Box::new(IntVec {
+                    items: Integers::U24(hi, low),
+                }))
+            }
+            32 => {
+                let vec: Vec<u32> = load_vec_u32(source)?;
+                Ok(Box::new(IntVec {
+                    items: Integers::U32(vec),
+                }))
+            }
+            48 => {
+                let hi: Vec<u16> = load_vec_u16(source)?;
+                let low: Vec<u32> = load_vec_u32(source)?;
+                Ok(Box::new(IntVec {
+                    items: Integers::U48(hi, low),
+                }))
+            }
+            64 => {
+                let vec: Vec<u64> = load_vec_u64(source)?;
+                Ok(Box::new(IntVec {
+                    items: Integers::U64(vec),
+                }))
+            }
+            _ => Err(Error::new(
+                ErrorKind::Other,
+                format!("unknown IntVec size: {}", z),
+            )),
         }
     }
 }

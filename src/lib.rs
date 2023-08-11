@@ -1,6 +1,7 @@
 pub mod set;
 pub mod rank;
 pub mod select;
+pub mod persist;
 pub mod words;
 pub mod dense64;
 pub mod naive_sparse;

@@ -1,4 +1,5 @@
 use crate::{
+    persist::{load_u64, load_vec_u32, load_vec_u64, save_vec, Persistent},
     rank::Rank,
     select::{Select, Select0},
     set::ImpliedSet,
@@ -40,7 +41,7 @@ pub struct Dense64 {
     size_: u64,
     words: Vec<u64>,
     randex: Vec<u32>,
-    seldex: Vec<u32>
+    seldex: Vec<u32>,
 }
 
 impl Dense64 {
@@ -109,11 +110,42 @@ impl Select for Dense64 {
     }
 }
 
-impl Select0 for Dense64 {
+impl Select0 for Dense64 {}
+
+impl Persistent for Dense64 {
+    fn save<Sink>(&self, sink: &mut Sink) -> std::io::Result<()>
+    where
+        Sink: std::io::Write,
+    {
+        sink.write_all(&self.size_.to_ne_bytes())?;
+        save_vec(sink, &self.words)?;
+        save_vec(sink, &self.randex)?;
+        save_vec(sink, &self.seldex)?;
+        Ok(())
+    }
+
+    fn load<Source>(source: &mut Source) -> std::io::Result<Box<Self>>
+    where
+        Source: std::io::Read,
+    {
+        let size_: u64 = load_u64(source)?;
+        let words: Vec<u64> = load_vec_u64(source)?;
+        let randex: Vec<u32> = load_vec_u32(source)?;
+        let seldex: Vec<u32> = load_vec_u32(source)?;
+        Ok(Box::new(Dense64 {
+            size_,
+            words,
+            randex,
+            seldex,
+        }))
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::io::BufWriter;
+    use std::io::Cursor;
+
     #[allow(unused_imports)]
     use num_traits::WrappingAdd;
     #[allow(unused_imports)]
@@ -219,49 +251,87 @@ mod tests {
         }
     }
 
-#[test]
-fn test_select_3() {
-    let m = 1024 * 1024;
-    let n = m / 64;
-    let k = 1024;
-    let mut bits = Vec::new();
-    let mut words = Vec::new();
-    words.resize(n, 0);
-    let mut rng = MiniRng::new(0xfbdb8b2bcc6674b8u64);
-    for _i in 0..k {
-        let x: u64 = (rng.rnd() ^ (rng.rnd() << 32) ^ (rng.rnd() >> 32)) % (m as u64);
-        bits.push(x);
-        let w = x / 64;
-        let b = x & 63;
-        words[w as usize] |= 1 << b;
-    }
-    bits.sort();
-    bits.dedup();
-    //println!("{:?}", bits);
+    #[test]
+    fn test_select_3() {
+        let m = 1024 * 1024;
+        let n = m / 64;
+        let k = 1024;
+        let mut bits = Vec::new();
+        let mut words = Vec::new();
+        words.resize(n, 0);
+        let mut rng = MiniRng::new(0xfbdb8b2bcc6674b8u64);
+        for _i in 0..k {
+            let x: u64 = (rng.rnd() ^ (rng.rnd() << 32) ^ (rng.rnd() >> 32)) % (m as u64);
+            bits.push(x);
+            let w = x / 64;
+            let b = x & 63;
+            words[w as usize] |= 1 << b;
+        }
+        bits.sort();
+        bits.dedup();
+        //println!("{:?}", bits);
 
-    let r = Dense64::new(m as u64, &words);
-    for i in 0..bits.len() {
-        //println!("i={}, x={}", i, bits[i]);
-        assert_eq!(r.select(i), bits[i]);
+        let r = Dense64::new(m as u64, &words);
+        for i in 0..bits.len() {
+            //println!("i={}, x={}", i, bits[i]);
+            assert_eq!(r.select(i), bits[i]);
+        }
     }
-}
 
-#[test]
-fn test_select0_1() {
-    let words: Vec<u64> = vec![0b100111u64];
-    let r = Dense64::new(6, &words);
-    assert_eq!(r.rank_0(0), 0);
-    assert_eq!(r.rank_0(1), 0);
-    assert_eq!(r.rank_0(2), 0);
-    assert_eq!(r.rank_0(3), 0);
-    assert_eq!(r.rank_0(4), 1);
-    assert_eq!(r.rank_0(5), 2);
-    assert_eq!(r.rank_0(6), 2);
-    assert_eq!(r.select(0), 0);
-    assert_eq!(r.select(1), 1);
-    assert_eq!(r.select(2), 2);
-    assert_eq!(r.select(3), 5);
-    assert_eq!(r.select_0(0), 3);
-    assert_eq!(r.select_0(1), 4);
-}
+    #[test]
+    fn test_select0_1() {
+        let words: Vec<u64> = vec![0b100111u64];
+        let r = Dense64::new(6, &words);
+        assert_eq!(r.rank_0(0), 0);
+        assert_eq!(r.rank_0(1), 0);
+        assert_eq!(r.rank_0(2), 0);
+        assert_eq!(r.rank_0(3), 0);
+        assert_eq!(r.rank_0(4), 1);
+        assert_eq!(r.rank_0(5), 2);
+        assert_eq!(r.rank_0(6), 2);
+        assert_eq!(r.select(0), 0);
+        assert_eq!(r.select(1), 1);
+        assert_eq!(r.select(2), 2);
+        assert_eq!(r.select(3), 5);
+        assert_eq!(r.select_0(0), 3);
+        assert_eq!(r.select_0(1), 4);
+    }
+
+    #[test]
+    fn test_load_and_save_1() {
+        let m = 1024 * 1024;
+        let n = m / 64;
+        let k = 1024;
+        let mut bits = Vec::new();
+        let mut words = Vec::new();
+        words.resize(n, 0);
+        let mut rng = MiniRng::new(0xfbdb8b2bcc6674b8u64);
+        for _i in 0..k {
+            let x: u64 = (rng.rnd() ^ (rng.rnd() << 32) ^ (rng.rnd() >> 32)) % (m as u64);
+            bits.push(x);
+            let w = x / 64;
+            let b = x & 63;
+            words[w as usize] |= 1 << b;
+        }
+        bits.sort();
+        bits.dedup();
+        //println!("{:?}", bits);
+
+        let r = Dense64::new(m as u64, &words);
+
+        let mut buf = BufWriter::new(Vec::new());
+        r.save(&mut buf).expect("save failed");
+        let bytes = buf.into_inner().expect("failed to get bytes");
+        let mut cursor = Cursor::new(bytes);
+        let s = Dense64::load(&mut cursor).expect("load failed");
+
+        for i in 0..k {
+            let x = bits[i];
+            println!("{} {}", i, x);
+            let j = s.rank(x);
+            assert_eq!(j, i);
+            let y = s.select(i);
+            assert_eq!(y, x);
+        }
+    }
 }

@@ -19,8 +19,8 @@ pub struct Sparse {
 
 impl Sparse {
     pub fn new(b: usize, n: usize, elements: &[u64]) -> Sparse {
-        let d = ((1 << b) as f64 / (1.44 * n as f64)).log2() as usize;
-        let m = (1 << d) - 1;
+        let d = ((1u64 << b) as f64 / (1.44 * n as f64)).log2() as usize;
+        let m = (1u64 << d) - 1;
         let mut hi_cursor = 0;
         let mut hi_bits = BitVec::new();
         let mut low_bits = IntVec::new(d);
@@ -47,7 +47,7 @@ impl Sparse {
 
 impl ImpliedSet for Sparse {
     fn size(&self) -> u64 {
-        1 << self.b
+        1u64 << self.b
     }
 
     fn count(&self) -> usize {
@@ -57,11 +57,11 @@ impl ImpliedSet for Sparse {
 
 impl Rank for Sparse {
     fn rank(&self, value: u64) -> usize {
-        if value >= (1 << self.b) {
+        if value >= (1u64 << self.b) {
             return self.count();
         }
         let hi = (value >> self.d) as usize;
-        let lo = value & ((1 << self.d) - 1);
+        let lo = value & ((1u64 << self.d) - 1);
         let r0 = self.hi.select(hi) as usize - hi;
         let r1 = self.hi.select(hi + 1) as usize - (hi + 1);
         let mut r = r0;
@@ -143,7 +143,7 @@ mod tests {
     }
 
     fn make_set(b: usize, n: usize) -> Vec<u64> {
-        let m = (1 << b) - 1;
+        let m = (1u64 << b) - 1;
         let mut rng = MiniRng::new(0xfbdb8b2bcc6674b8u64);
         let mut s = HashSet::new();
         while s.len() < n {

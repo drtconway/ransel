@@ -25,11 +25,25 @@ where
     Ok(())
 }
 
-pub fn load_u64<Source>(source: &mut Source) -> std::io::Result<u64> where Source: Read {
+pub fn load_u64<Source>(source: &mut Source) -> std::io::Result<u64>
+where
+    Source: Read,
+{
     const X_SIZE: usize = std::mem::size_of::<u64>();
     let mut x_buf: [u8; X_SIZE] = [0; X_SIZE];
     source.read_exact(&mut x_buf)?;
     let x: u64 = FromBytes::from_ne_bytes(&x_buf);
+    Ok(x)
+}
+
+pub fn load_usize<Source>(source: &mut Source) -> std::io::Result<usize>
+where
+    Source: Read,
+{
+    const X_SIZE: usize = std::mem::size_of::<usize>();
+    let mut x_buf: [u8; X_SIZE] = [0; X_SIZE];
+    source.read_exact(&mut x_buf)?;
+    let x: usize = FromBytes::from_ne_bytes(&x_buf);
     Ok(x)
 }
 
@@ -120,6 +134,29 @@ where
     for _i in 0..n {
         source.read_exact(&mut x_buf)?;
         let x: u64 = FromBytes::from_ne_bytes(&x_buf);
+        res.push(x);
+    }
+    Ok(res)
+}
+
+pub fn load_vec_usize<Source>(source: &mut Source) -> std::io::Result<Vec<usize>>
+where
+    Source: Read,
+{
+    const N_SIZE: usize = std::mem::size_of::<usize>();
+    let mut n_buf: [u8; N_SIZE] = [0; N_SIZE];
+    source.read_exact(&mut n_buf)?;
+    let n: usize = FromBytes::from_ne_bytes(&n_buf);
+
+    let mut res: Vec<usize> = Vec::new();
+    res.reserve(n);
+
+    const X_SIZE: usize = std::mem::size_of::<usize>();
+    let mut x_buf: [u8; X_SIZE] = [0; X_SIZE];
+
+    for _i in 0..n {
+        source.read_exact(&mut x_buf)?;
+        let x: usize = FromBytes::from_ne_bytes(&x_buf);
         res.push(x);
     }
     Ok(res)

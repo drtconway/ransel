@@ -1,10 +1,14 @@
-use crate::{set::ImpliedSet, rank::Rank, select::Select};
-
+use crate::{
+    persist::{load_usize, load_vec_u64, save_vec, Persistent, load_vec_usize},
+    rank::Rank,
+    select::Select,
+    set::ImpliedSet,
+};
 
 pub struct NaiveSparse {
     b: usize,
     elements: Vec<u64>,
-    toc: Vec<usize>
+    toc: Vec<usize>,
 }
 
 static B: usize = 10;
@@ -28,7 +32,11 @@ impl NaiveSparse {
             toc[i] = count;
             count += c;
         }
-        NaiveSparse { b, elements: Vec::from(elements), toc }
+        NaiveSparse {
+            b,
+            elements: Vec::from(elements),
+            toc,
+        }
     }
 }
 
@@ -69,6 +77,28 @@ impl Rank for NaiveSparse {
 impl Select for NaiveSparse {
     fn select(&self, index: usize) -> u64 {
         self.elements[index]
+    }
+}
+
+impl Persistent for NaiveSparse {
+    fn save<Sink>(&self, sink: &mut Sink) -> std::io::Result<()>
+    where
+        Sink: std::io::Write,
+    {
+        sink.write_all(&self.b.to_ne_bytes())?;
+        save_vec(sink, &self.elements)?;
+        save_vec(sink, &self.toc)?;
+        Ok(())
+    }
+
+    fn load<Source>(source: &mut Source) -> std::io::Result<Box<Self>>
+    where
+        Source: std::io::Read,
+    {
+        let b: usize = load_usize(source)?;
+        let elements = load_vec_u64(source)?;
+        let toc = load_vec_usize(source)?;
+        Ok(Box::new(NaiveSparse { b, elements, toc }))
     }
 }
 
@@ -114,7 +144,7 @@ mod tests {
 
         let r = NaiveSparse::new(b, &xs);
         for i in 0..xs.len() {
-            let x= xs[i];
+            let x = xs[i];
             println!("xs[i]={}", x);
             let j = r.rank(x);
             assert_eq!(j, i);

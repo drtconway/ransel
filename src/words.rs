@@ -9,7 +9,11 @@ pub fn rank64(x: u64, pos: u64) -> u64 {
 }
 
 pub fn select64(x: u64, idx: usize) -> u64 {
-    (1 << idx).pdep(x).trailing_zeros() as u64
+    if x == 18446744073709551615u64 {
+        // pdep appears to fail on 111...111
+        return idx as u64;
+    }
+    (1u64 << idx).pdep(x).trailing_zeros() as u64
 }
 
 #[cfg(test)]
@@ -43,5 +47,11 @@ mod tests {
         assert_eq!(select64(x, 4), 5);
         assert_eq!(select64(x, 5), 6);
         assert_eq!(select64(x, 47), 63);
+    }
+
+    #[test]
+    fn test_select64_2() {
+        let x:u64 = 18446744073709551615u64;
+        assert_eq!(select64(x, 0), 0);
     }
 }

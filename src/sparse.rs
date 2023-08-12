@@ -116,6 +116,10 @@ impl Persistent for Sparse {
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;
+    use std::fs::File;
+    use std::io::BufRead;
+    use std::io::BufReader;
+    use flate2;
 
     #[allow(unused_imports)]
     use num_traits::WrappingAdd;
@@ -205,6 +209,28 @@ mod tests {
             let y = s.select(i);
             println!("i={}, x={}, y={}", i, x, y);
             assert_eq!(y, x);
+        }
+    }
+
+    #[test]
+    fn test_big_sparse() {
+        let b: usize = 50;
+        let mut xs: Vec<u64> = Vec::new();
+        {
+            let file = File::open("./test_data/b_50_integers.txt.gz").expect("failed to open file");
+            let buffer = BufReader::new(file);
+            let gzip = flate2::bufread::GzDecoder::new(buffer);
+            let reader = BufReader::new(gzip);
+            for line in reader.lines() {
+                let txt = line.expect("failed to read line");
+                let x:u64 = txt.parse().expect("not an integer");
+                xs.push(x);
+            }
+        }
+        let n = xs.len();
+        let s = Sparse::new(b, n, &xs);
+        for i in 0..xs.len() {
+            assert_eq!(s.rank(xs[i]), i);
         }
     }
 }

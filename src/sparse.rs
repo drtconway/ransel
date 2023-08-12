@@ -76,13 +76,6 @@ impl Select for Sparse {
     fn select(&self, index: usize) -> u64 {
         let z = self.hi.select_0(index);
         let hi = self.hi.rank(z) as u64 - 1;
-        println!(
-            "index={}, z={}, hi={}, lo={}",
-            index,
-            z,
-            hi,
-            self.lo.get(index)
-        );
         (hi << self.d) | self.lo.get(index)
     }
 }
@@ -207,7 +200,6 @@ mod tests {
         for i in 0..xs.len() {
             let x = xs[i];
             let y = s.select(i);
-            println!("i={}, x={}, y={}", i, x, y);
             assert_eq!(y, x);
         }
     }

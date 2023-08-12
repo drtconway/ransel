@@ -29,7 +29,6 @@ fn select_from_rank(randex: &[u32], words: &[u64], index: usize) -> u64 {
         i += 1;
     }
     let r0 = randex[i] as usize;
-    println!("i={}, x={}, index={}, r0={}, index-r0={}", i, words[i], index, r0, index - r0);
     64 * i as u64 + select64(words[i], index - r0)
 }
 

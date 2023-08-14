@@ -82,7 +82,7 @@ impl Rank for Sparse {
         if hi_1 != hi_2 || value_2 < value_1 || value_2 >= (1u64 << self.d) {
             return (self.rank(value_1), self.rank(value_2));
         }
-        
+
         let hi = hi_1;
         let lo_1 = value_1 & ((1u64 << self.d) - 1);
         let lo_2 = value_2 & ((1u64 << self.d) - 1);
@@ -137,11 +137,11 @@ impl Persistent for Sparse {
 
 #[cfg(test)]
 mod tests {
+    use flate2;
     use std::collections::HashSet;
     use std::fs::File;
     use std::io::BufRead;
     use std::io::BufReader;
-    use flate2;
 
     #[allow(unused_imports)]
     use num_traits::WrappingAdd;
@@ -246,7 +246,7 @@ mod tests {
             let reader = BufReader::new(gzip);
             for line in reader.lines() {
                 let txt = line.expect("failed to read line");
-                let x:u64 = txt.parse().expect("not an integer");
+                let x: u64 = txt.parse().expect("not an integer");
                 xs.push(x);
             }
         }
@@ -257,14 +257,14 @@ mod tests {
             assert_eq!(s.select(i), xs[i]);
         }
         {
-            let (r,c) = s.access_and_rank(0x3FFBC2C2BC000u64);
+            let (r, c) = s.access_and_rank(0x3FFBC2C2BC000u64);
             assert_eq!(c, true);
             assert_eq!(r, s.count() - 1);
         }
         {
-            let (r,c) = s.access_and_rank(0x3FFC9480BC000u64);
+            let (r, c) = s.access_and_rank(0x3FFC9480BC000u64);
             assert_eq!(c, false);
             assert_eq!(r, s.count());
         }
-        }
+    }
 }

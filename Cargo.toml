@@ -1,6 +1,6 @@
 [package]
 name = "ransel"
-version = "0.1.5"
+version = "0.1.6"
 description = "a library for rank/select succinct data structures"
 edition = "2021"
 license = "GPL-3.0-only"

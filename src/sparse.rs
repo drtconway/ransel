@@ -34,6 +34,11 @@ impl Sparse {
             hi_bits.push(false);
             low_bits.push(lo);
         }
+        let j = 1u64 << (b - d);
+        while hi_cursor < j {
+            hi_bits.push(true);
+            hi_cursor += 1;
+        }
         hi_bits.push(true);
         Sparse {
             b,
@@ -161,8 +166,8 @@ mod tests {
         assert_eq!(s.b, b);
         assert_eq!(s.n, n);
         assert_eq!(s.d, 9);
-        assert_eq!(s.hi.count(), 2048);
-        assert_eq!(s.hi.size(), 2048 + n as u64);
+        assert_eq!(s.hi.count(), 2049);
+        assert_eq!(s.hi.size(), 2049 + n as u64);
         assert_eq!(s.lo.len(), n);
     }
 
@@ -175,8 +180,8 @@ mod tests {
         assert_eq!(s.b, b);
         assert_eq!(s.n, n);
         assert_eq!(s.d, 9);
-        assert_eq!(s.hi.count(), 2048);
-        assert_eq!(s.hi.size(), 2048 + n as u64);
+        assert_eq!(s.hi.count(), 2049);
+        assert_eq!(s.hi.size(), 2049 + n as u64);
         assert_eq!(s.lo.len(), n);
         for i in 0..xs.len() {
             let x = xs[i];
@@ -194,8 +199,8 @@ mod tests {
         assert_eq!(s.b, b);
         assert_eq!(s.n, n);
         assert_eq!(s.d, 9);
-        assert_eq!(s.hi.count(), 2048);
-        assert_eq!(s.hi.size(), 2048 + n as u64);
+        assert_eq!(s.hi.count(), 2049);
+        assert_eq!(s.hi.size(), 2049 + n as u64);
         assert_eq!(s.lo.len(), n);
         for i in 0..xs.len() {
             let x = xs[i];
@@ -223,6 +228,17 @@ mod tests {
         let s = Sparse::new(b, n, &xs);
         for i in 0..xs.len() {
             assert_eq!(s.rank(xs[i]), i);
+            assert_eq!(s.select(i), xs[i]);
         }
-    }
+        {
+            let (r,c) = s.access_and_rank(0x3FFBC2C2BC000u64);
+            assert_eq!(c, true);
+            assert_eq!(r, s.count() - 1);
+        }
+        {
+            let (r,c) = s.access_and_rank(0x3FFC9480BC000u64);
+            assert_eq!(c, false);
+            assert_eq!(r, s.count());
+        }
+        }
 }

@@ -75,6 +75,30 @@ impl Rank for Sparse {
         }
         r as usize
     }
+
+    fn rank_2(&self, value_1: u64, value_2: u64) -> (usize, usize) {
+        let hi_1 = (value_1 >> self.d) as usize;
+        let hi_2 = (value_2 >> self.d) as usize;
+        if hi_1 != hi_2 || value_2 < value_1 || value_2 >= (1u64 << self.d) {
+            return (self.rank(value_1), self.rank(value_2));
+        }
+        
+        let hi = hi_1;
+        let lo_1 = value_1 & ((1u64 << self.d) - 1);
+        let lo_2 = value_2 & ((1u64 << self.d) - 1);
+        let r0 = self.hi.select(hi) as usize - hi;
+        let r1 = self.hi.select(hi + 1) as usize - (hi + 1);
+
+        let mut r_a = r0;
+        while r_a < r1 && self.lo.get(r_a) < lo_1 {
+            r_a += 1;
+        }
+        let mut r_b = r_a;
+        while r_b < r1 && self.lo.get(r_b) < lo_2 {
+            r_b += 1;
+        }
+        (r_a, r_b)
+    }
 }
 
 impl Select for Sparse {
@@ -163,6 +187,8 @@ mod tests {
         let n: usize = 1024;
         let xs = make_set(b, n);
         let s = Sparse::new(b, n, &xs);
+        assert_eq!(s.size(), 1u64 << b);
+        assert_eq!(s.count(), n);
         assert_eq!(s.b, b);
         assert_eq!(s.n, n);
         assert_eq!(s.d, 9);

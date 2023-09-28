@@ -8,3 +8,4 @@ pub mod naive_sparse;
 pub mod sparse;
 pub mod bitvec;
 pub mod intvec;
+pub mod sorted;

@@ -8,8 +8,6 @@ pub struct Sorted {
     elements: Vec<u64>,
 }
 
-static B: usize = 10;
-
 impl Sorted {
     pub fn new(elements: &[u64]) -> Sorted {
         Sorted {

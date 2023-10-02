@@ -1,276 +1,209 @@
 //! A module for storing unsigned integers of different widths.
 
-use std::io::{Error, ErrorKind};
-
-use crate::persist::{
-    load_usize, load_vec_u16, load_vec_u32, load_vec_u64, load_vec_u8, save_vec, Persistent,
-};
-
-enum Integers {
-    U8(Vec<u8>),
-    U16(Vec<u16>),
-    U24(Vec<u8>, Vec<u16>),
-    U32(Vec<u32>),
-    U48(Vec<u16>, Vec<u32>),
-    U64(Vec<u64>),
-}
+use crate::persist::{Persistent, save_vec, load_vec_u64, load_usize};
 
 /// A vector of unsigned integers.
-/// 
-/// Values are stored in a vector of an appropriate width, or
-/// in some cases 2 vectors, if required.
-/// 
+///
+/// Values are stored in a vector of words.
+///
 pub struct IntVec {
-    items: Integers,
+    b: usize,
+    n: usize,
+    words: Vec<u64>,
 }
 
 impl IntVec {
     /// Create an empty vector for integers of the requested width.
     pub fn new(b: usize) -> IntVec {
-        if b <= 8 {
-            IntVec::new8()
-        } else if b <= 16 {
-            IntVec::new16()
-        } else if b <= 24 {
-            IntVec::new24()
-        } else if b <= 32 {
-            IntVec::new32()
-        } else if b <= 48 {
-            IntVec::new48()
-        } else {
-            IntVec::new64()
-        }
-    }
-
-    fn new8() -> IntVec {
         IntVec {
-            items: Integers::U8(Vec::new()),
-        }
-    }
-
-    fn new16() -> IntVec {
-        IntVec {
-            items: Integers::U16(Vec::new()),
-        }
-    }
-
-    fn new24() -> IntVec {
-        IntVec {
-            items: Integers::U24(Vec::new(), Vec::new()),
-        }
-    }
-
-    fn new32() -> IntVec {
-        IntVec {
-            items: Integers::U32(Vec::new()),
-        }
-    }
-
-    fn new48() -> IntVec {
-        IntVec {
-            items: Integers::U48(Vec::new(), Vec::new()),
-        }
-    }
-
-    fn new64() -> IntVec {
-        IntVec {
-            items: Integers::U64(Vec::new()),
+            b,
+            n: 0,
+            words: Vec::new(),
         }
     }
 
     /// Return the length of the vector.
     pub fn len(&self) -> usize {
-        match &self.items {
-            Integers::U8(vec) => vec.len(),
-            Integers::U16(vec) => vec.len(),
-            Integers::U24(hi, _low) => hi.len(),
-            Integers::U32(vec) => vec.len(),
-            Integers::U48(hi, _low) => hi.len(),
-            Integers::U64(vec) => vec.len(),
+        self.n
+    }
+
+    /// Append a value to the vector.
+    pub fn push(&mut self, value: u64) {
+        let idx = self.n;
+        self.n += 1;
+        let end_bit = (idx + 1) * self.b;
+        while self.words.len() * 64 < end_bit {
+            self.words.push(0);
+        }
+        self.set(idx, value)
+    }
+
+    /// Get an element from the vector
+    pub fn get(&self, idx: usize) -> u64 {
+        assert!(idx < self.len());
+        let begin_bit = idx * self.b;
+        let end_bit = (idx + 1) * self.b;
+
+        let begin_word = begin_bit / 64;
+        let begin_bit_in_word = begin_bit & 63;
+        let end_word = end_bit / 64;
+        let end_bit_in_word = end_bit & 63;
+
+        if end_word != begin_word && end_bit_in_word > 0 {
+            // Spanning 2 words
+            let low_bits = self.words[begin_word] >> begin_bit_in_word;
+            let high_bits = self.words[end_word] & ((1u64 << end_bit_in_word) - 1);
+            low_bits | (high_bits << (self.b - end_bit_in_word))
+        } else {
+            // All the bits are in 1 word
+            let w = self.words[begin_word];
+            let mask = (1u64 << self.b) - 1;
+            (w >> begin_bit_in_word) & mask
         }
     }
 
-    /// Push a new value on to the end of the vector.
-    pub fn push(&mut self, x: u64) {
-        match &mut self.items {
-            Integers::U8(vec) => {
-                vec.push(x as u8);
-            }
-            Integers::U16(vec) => {
-                vec.push(x as u16);
-            }
-            Integers::U24(hi, low) => {
-                hi.push((x >> 16) as u8);
-                low.push(x as u16);
-            }
-            Integers::U32(vec) => {
-                vec.push(x as u32);
-            }
-            Integers::U48(hi, low) => {
-                hi.push((x >> 32) as u16);
-                low.push(x as u32);
-            }
-            Integers::U64(vec) => {
-                vec.push(x);
-            }
-        }
-    }
+    /// Set an element in the vector.
+    pub fn set(&mut self, idx: usize, value: u64) {
+        assert!(idx < self.len());
+        assert!(value < (1u64 << self.b));
 
-    /// Reserve enough space for the given number of elements.
-    pub fn reserve(&mut self, n: usize) {
-        match &mut self.items {
-            Integers::U8(vec) => {
-                vec.reserve(n);
-            }
-            Integers::U16(vec) => {
-                vec.reserve(n);
-            }
-            Integers::U24(hi, low) => {
-                hi.reserve(n);
-                low.reserve(n);
-            }
-            Integers::U32(vec) => {
-                vec.reserve(n);
-            }
-            Integers::U48(hi, low) => {
-                hi.reserve(n);
-                low.reserve(n);
-            }
-            Integers::U64(vec) => {
-                vec.reserve(n);
-            }
-        }
-    }
+        let begin_bit = idx * self.b;
+        let end_bit = (idx + 1) * self.b;
 
-    /// Get an element from the vector.
-    pub fn get(&self, index: usize) -> u64 {
-        match &self.items {
-            Integers::U8(vec) => vec[index] as u64,
-            Integers::U16(vec) => vec[index] as u64,
-            Integers::U24(hi, low) => (hi[index] as u64) << 16 | low[index] as u64,
-            Integers::U32(vec) => vec[index] as u64,
-            Integers::U48(hi, low) => (hi[index] as u64) << 32 | low[index] as u64,
-            Integers::U64(vec) => vec[index],
-        }
-    }
+        let begin_word = begin_bit / 64;
+        let begin_bit_in_word = begin_bit & 63;
+        let end_word = end_bit / 64;
+        let end_bit_in_word = end_bit & 63;
 
-    /// Update an element of the vector.
-    pub fn set(&mut self, index: usize, x: u64) {
-        match &mut self.items {
-            Integers::U8(vec) => {
-                vec[index] = x as u8;
-            }
-            Integers::U16(vec) => {
-                vec[index] = x as u16;
-            }
-            Integers::U24(hi, low) => {
-                hi[index] = (x >> 16) as u8;
-                low[index] = x as u16;
-            }
-            Integers::U32(vec) => {
-                vec[index] = x as u32;
-            }
-            Integers::U48(hi, low) => {
-                hi[index] = (x >> 32) as u16;
-                low[index] = x as u32;
-            }
-            Integers::U64(vec) => {
-                vec[index] = x;
-            }
+        if end_word != begin_word && end_bit_in_word > 0 {
+            // Spanning 2 words
+            let low_word_bits = self.b - end_bit_in_word;
+            let low_bits_mask = (1u64 << low_word_bits) - 1;
+            let low_bits = value & low_bits_mask;
+            let high_bits = value >> low_word_bits;
+            let low_word_mask = !(low_bits_mask << begin_bit_in_word);
+            let low_word = self.words[begin_word];
+            self.words[begin_word] = (low_word & low_word_mask) | (low_bits << begin_bit_in_word);
+            let high_word_mask = !((1u64 << end_bit_in_word) - 1);
+            let high_word = self.words[end_word];
+            self.words[end_word] = (high_word & high_word_mask) | high_bits;
+        } else {
+            // All the bits are in 1 word
+            let w = self.words[begin_word];
+            let mask = !(((1u64 << self.b) - 1) << begin_bit_in_word);
+            self.words[begin_word] = (w & mask) | (value << begin_bit_in_word);
         }
     }
 }
 
 impl Persistent for IntVec {
-    fn save<Sink>(&self, sink: &mut Sink) -> std::io::Result<()>
-    where
-        Sink: std::io::Write,
-    {
-        match &self.items {
-            Integers::U8(vec) => {
-                let fmt: usize = 8;
-                sink.write_all(&fmt.to_ne_bytes())?;
-                save_vec(sink, vec)?;
-            }
-            Integers::U16(vec) => {
-                let fmt: usize = 16;
-                sink.write_all(&fmt.to_ne_bytes())?;
-                save_vec(sink, vec)?;
-            }
-            Integers::U24(hi, low) => {
-                let fmt: usize = 24;
-                sink.write_all(&fmt.to_ne_bytes())?;
-                save_vec(sink, hi)?;
-                save_vec(sink, low)?;
-            }
-            Integers::U32(vec) => {
-                let fmt: usize = 32;
-                sink.write_all(&fmt.to_ne_bytes())?;
-                save_vec(sink, vec)?;
-            }
-            Integers::U48(hi, low) => {
-                let fmt: usize = 48;
-                sink.write_all(&fmt.to_ne_bytes())?;
-                save_vec(sink, hi)?;
-                save_vec(sink, low)?;
-            }
-            Integers::U64(vec) => {
-                let fmt: usize = 64;
-                sink.write_all(&fmt.to_ne_bytes())?;
-                save_vec(sink, vec)?;
-            }
-        }
-        Ok(())
-    }
-
     fn load<Source>(source: &mut Source) -> std::io::Result<Box<Self>>
     where
         Source: std::io::Read,
     {
-        let z = load_usize(source)?;
-        match z {
-            8 => {
-                let vec: Vec<u8> = load_vec_u8(source)?;
-                Ok(Box::new(IntVec {
-                    items: Integers::U8(vec),
-                }))
-            }
-            16 => {
-                let vec: Vec<u16> = load_vec_u16(source)?;
-                Ok(Box::new(IntVec {
-                    items: Integers::U16(vec),
-                }))
-            }
-            24 => {
-                let hi: Vec<u8> = load_vec_u8(source)?;
-                let low: Vec<u16> = load_vec_u16(source)?;
-                Ok(Box::new(IntVec {
-                    items: Integers::U24(hi, low),
-                }))
-            }
-            32 => {
-                let vec: Vec<u32> = load_vec_u32(source)?;
-                Ok(Box::new(IntVec {
-                    items: Integers::U32(vec),
-                }))
-            }
-            48 => {
-                let hi: Vec<u16> = load_vec_u16(source)?;
-                let low: Vec<u32> = load_vec_u32(source)?;
-                Ok(Box::new(IntVec {
-                    items: Integers::U48(hi, low),
-                }))
-            }
-            64 => {
-                let vec: Vec<u64> = load_vec_u64(source)?;
-                Ok(Box::new(IntVec {
-                    items: Integers::U64(vec),
-                }))
-            }
-            _ => Err(Error::new(
-                ErrorKind::Other,
-                format!("unknown IntVec size: {}", z),
-            )),
+        let b: usize = load_usize(source)?;
+        let n: usize = load_usize(source)?;
+        let words: Vec<u64> = load_vec_u64(source)?;
+        Ok(Box::new(IntVec {b, n, words}))
+    }
+
+    fn save<Sink>(&self, sink: &mut Sink) -> std::io::Result<()>
+    where
+        Sink: std::io::Write,
+    {
+        sink.write_all(&self.b.to_ne_bytes())?;
+        sink.write_all(&self.n.to_ne_bytes())?;
+        save_vec(sink, &self.words)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use random::Source;
+
+    #[test]
+    fn test_intvec_1() {
+        let mut xs: Vec<u64> = Vec::new();
+        let b = 4;
+        let mask = (1u64 << b) - 1;
+        let n = 1000;
+        let mut rng = random::default(19);
+        for _i in 0..n {
+            xs.push(rng.read_u64() & mask);
+        }
+
+        let mut v = IntVec::new(b);
+        for x in xs.iter() {
+            v.push(*x);
+        }
+        assert!(v.words.len() * 64 >= n * b);
+        for i in 0..n {
+            assert_eq!(v.get(i), xs[i]);
+        }
+    }
+
+    #[test]
+    fn test_intvec_2() {
+        let mut xs: Vec<u64> = Vec::new();
+        let b = 7;
+        let mask = (1u64 << b) - 1;
+        let n = 1000;
+        let mut rng = random::default(19);
+        for _i in 0..n {
+            xs.push(rng.read_u64() & mask);
+        }
+
+        let mut v = IntVec::new(b);
+        for x in xs.iter() {
+            v.push(*x);
+        }
+        assert!(v.words.len() * 64 >= n * b);
+        for i in 0..n {
+            assert_eq!(v.get(i), xs[i]);
+        }
+    }
+
+    #[test]
+    fn test_intvec_3() {
+        let mut xs: Vec<u64> = Vec::new();
+        let b = 47;
+        let mask = (1u64 << b) - 1;
+        let n = 1000;
+        let mut rng = random::default(19);
+        for _i in 0..n {
+            xs.push(rng.read_u64() & mask);
+        }
+
+        let mut v = IntVec::new(b);
+        for x in xs.iter() {
+            v.push(*x);
+        }
+        assert!(v.words.len() * 64 >= n * b);
+        for i in 0..n {
+            assert_eq!(v.get(i), xs[i]);
+        }
+    }
+
+    #[test]
+    fn test_intvec_4() {
+        let mut xs: Vec<u64> = Vec::new();
+        let b = 63;
+        let mask = (1u64 << b) - 1;
+        let n = 1000;
+        let mut rng = random::default(19);
+        for _i in 0..n {
+            xs.push(rng.read_u64() & mask);
+        }
+
+        let mut v = IntVec::new(b);
+        for x in xs.iter() {
+            v.push(*x);
+        }
+        assert!(v.words.len() * 64 >= n * b);
+        for i in 0..n {
+            assert_eq!(v.get(i), xs[i]);
         }
     }
 }

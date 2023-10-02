@@ -1,6 +1,6 @@
 [package]
 name = "ransel"
-version = "0.2.0"
+version = "0.2.1"
 description = "a library for rank/select succinct data structures"
 edition = "2021"
 license = "GPL-3.0-only"
@@ -12,3 +12,6 @@ repository = "https://github.com/drtconway/ransel"
 bitintr = "0.3.0"
 num-traits = "0.2.16"
 flate2 = "1.0.26"
+
+[dev-dependencies]
+random = "0.14.0"

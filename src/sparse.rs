@@ -1,3 +1,9 @@
+//! A succinct sparse set representation based on the Okanohara & Sadakane 2007 paper:
+//!
+//! > Okanohara, D. and Sadakane, K., 2007, January. Practical entropy-compressed rank/select dictionary.
+//! >  In 2007 Proceedings of the Ninth Workshop on Algorithm Engineering and Experiments (ALENEX) (pp. 60-70).
+//1 > Society for Industrial and Applied Mathematics.
+
 use crate::{
     bitvec::BitVec,
     dense64::Dense64,
@@ -9,6 +15,33 @@ use crate::{
     set::ImpliedSet,
 };
 
+/// The `Sparse` data structure implements the succinct set representation for sparse sets
+/// described by:
+///
+/// > Okanohara, D. and Sadakane, K., 2007, January. Practical entropy-compressed rank/select dictionary.
+/// >  In 2007 Proceedings of the Ninth Workshop on Algorithm Engineering and Experiments (ALENEX) (pp. 60-70).
+/// > Society for Industrial and Applied Mathematics.
+///
+/// #Examples
+///
+/// ```
+/// use crate::ransel::sparse::Sparse;
+/// use crate::ransel::rank::Rank;
+/// use crate::ransel::select::Select;
+///
+/// let mix = |i:u64| i.wrapping_mul(2862933555777941757u64).wrapping_add(3037000493u64);
+/// let b = 48;
+/// let n = 1u64 << b;
+/// let m = n - 1;
+/// let mut xs: Vec<u64> = Vec::from_iter((0..100_000).map(mix).map(|x| x & m));
+/// xs.sort();
+/// xs.dedup();
+/// let s = Sparse::new(b, &xs);
+/// for i in 0..xs.len() {
+///     assert_eq!(s.select(i), xs[i]);
+///     assert_eq!(s.rank(xs[i]), i);
+/// }
+/// ```
 pub struct Sparse {
     b: usize,
     n: usize,
@@ -18,7 +51,15 @@ pub struct Sparse {
 }
 
 impl Sparse {
-    pub fn new(b: usize, n: usize, elements: &[u64]) -> Sparse {
+    /// Create a new sparse set.
+    ///
+    /// The parameter `b` should be the maximum number of bits required for any
+    /// element of the set. Nb this means the size of the set is `2**b`.
+    ///
+    /// The sequence `elements` must be in sorted order, and free of duplicates.
+    ///
+    pub fn new(b: usize, elements: &[u64]) -> Sparse {
+        let n = elements.len();
         let d = ((1u64 << b) as f64 / (1.44 * n as f64)).log2() as usize;
         let m = (1u64 << d) - 1;
         let mut hi_cursor = 0;
@@ -186,7 +227,7 @@ mod tests {
         let b: usize = 20;
         let n: usize = 1024;
         let xs = make_set(b, n);
-        let s = Sparse::new(b, n, &xs);
+        let s = Sparse::new(b, &xs);
         assert_eq!(s.size(), 1u64 << b);
         assert_eq!(s.count(), n);
         assert_eq!(s.b, b);
@@ -202,7 +243,7 @@ mod tests {
         let b: usize = 20;
         let n: usize = 1024;
         let xs = make_set(b, n);
-        let s = Sparse::new(b, n, &xs);
+        let s = Sparse::new(b, &xs);
         assert_eq!(s.b, b);
         assert_eq!(s.n, n);
         assert_eq!(s.d, 9);
@@ -221,7 +262,7 @@ mod tests {
         let b: usize = 20;
         let n: usize = 1024;
         let xs = make_set(b, n);
-        let s = Sparse::new(b, n, &xs);
+        let s = Sparse::new(b, &xs);
         assert_eq!(s.b, b);
         assert_eq!(s.n, n);
         assert_eq!(s.d, 9);
@@ -250,8 +291,7 @@ mod tests {
                 xs.push(x);
             }
         }
-        let n = xs.len();
-        let s = Sparse::new(b, n, &xs);
+        let s = Sparse::new(b, &xs);
         for i in 0..xs.len() {
             assert_eq!(s.rank(xs[i]), i);
             assert_eq!(s.select(i), xs[i]);

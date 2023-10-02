@@ -1,12 +1,14 @@
+//! Traits for implicit set operations.
 
+/// The trait `ImpliedSet` exposes a basic set-like property of a data structure
+/// over non-negative integers.
+/// 
 pub trait ImpliedSet {
-    /**
-     * @return the number of elements in the implied set.
-     */
+    /// Return the number of elements in the set.
     fn count(&self) -> usize;
 
-    /**
-     * @return the size of the domain (1 greater than the largest possible value in the set)
-     */
+    /// Return the size of the domain of the set.
+    ///
+    /// Must be at least 1 greater than the largest element in the set.
     fn size(&self) -> u64;
 }

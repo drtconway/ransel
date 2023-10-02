@@ -1,3 +1,5 @@
+//! A module for storing unsigned integers of different widths.
+
 use std::io::{Error, ErrorKind};
 
 use crate::persist::{
@@ -13,11 +15,17 @@ enum Integers {
     U64(Vec<u64>),
 }
 
+/// A vector of unsigned integers.
+/// 
+/// Values are stored in a vector of an appropriate width, or
+/// in some cases 2 vectors, if required.
+/// 
 pub struct IntVec {
     items: Integers,
 }
 
 impl IntVec {
+    /// Create an empty vector for integers of the requested width.
     pub fn new(b: usize) -> IntVec {
         if b <= 8 {
             IntVec::new8()
@@ -34,42 +42,43 @@ impl IntVec {
         }
     }
 
-    pub fn new8() -> IntVec {
+    fn new8() -> IntVec {
         IntVec {
             items: Integers::U8(Vec::new()),
         }
     }
 
-    pub fn new16() -> IntVec {
+    fn new16() -> IntVec {
         IntVec {
             items: Integers::U16(Vec::new()),
         }
     }
 
-    pub fn new24() -> IntVec {
+    fn new24() -> IntVec {
         IntVec {
             items: Integers::U24(Vec::new(), Vec::new()),
         }
     }
 
-    pub fn new32() -> IntVec {
+    fn new32() -> IntVec {
         IntVec {
             items: Integers::U32(Vec::new()),
         }
     }
 
-    pub fn new48() -> IntVec {
+    fn new48() -> IntVec {
         IntVec {
             items: Integers::U48(Vec::new(), Vec::new()),
         }
     }
 
-    pub fn new64() -> IntVec {
+    fn new64() -> IntVec {
         IntVec {
             items: Integers::U64(Vec::new()),
         }
     }
 
+    /// Return the length of the vector.
     pub fn len(&self) -> usize {
         match &self.items {
             Integers::U8(vec) => vec.len(),
@@ -81,6 +90,7 @@ impl IntVec {
         }
     }
 
+    /// Push a new value on to the end of the vector.
     pub fn push(&mut self, x: u64) {
         match &mut self.items {
             Integers::U8(vec) => {
@@ -106,6 +116,7 @@ impl IntVec {
         }
     }
 
+    /// Reserve enough space for the given number of elements.
     pub fn reserve(&mut self, n: usize) {
         match &mut self.items {
             Integers::U8(vec) => {
@@ -131,6 +142,7 @@ impl IntVec {
         }
     }
 
+    /// Get an element from the vector.
     pub fn get(&self, index: usize) -> u64 {
         match &self.items {
             Integers::U8(vec) => vec[index] as u64,
@@ -142,6 +154,7 @@ impl IntVec {
         }
     }
 
+    /// Update an element of the vector.
     pub fn set(&mut self, index: usize, x: u64) {
         match &mut self.items {
             Integers::U8(vec) => {

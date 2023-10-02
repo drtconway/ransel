@@ -1,3 +1,5 @@
+//! A simple sparse set based on an indexed sorted vector.
+
 use crate::{
     persist::{load_usize, load_vec_u64, save_vec, Persistent, load_vec_usize},
     rank::Rank,
@@ -5,6 +7,14 @@ use crate::{
     set::ImpliedSet,
 };
 
+/// A simple index sparse set representation.
+/// 
+/// This representation is not succinct - it stores the elements of the set
+/// in a sorted vector, and computes a table-of-contents to accelerate the
+/// binary search based implementation of `rank`.
+/// 
+/// It uses a 1024 entry table of contents.
+/// 
 pub struct NaiveSparse {
     b: usize,
     elements: Vec<u64>,
@@ -14,11 +24,11 @@ pub struct NaiveSparse {
 static B: usize = 10;
 
 impl NaiveSparse {
+    /// Create a naive sparse set for values with `b` bits.
     pub fn new(b: usize, elements: &[u64]) -> NaiveSparse {
         assert!(b > B);
-        let n = 1 << b;
-        let m = n >> B;
-        let s = b - B;
+        let m = 1 << B;
+        let s = if b > B { b - B } else { 0 };
         let mut toc = Vec::new();
         toc.resize(m + 1, 0);
         for i in 0..elements.len() {

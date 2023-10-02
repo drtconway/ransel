@@ -1,14 +1,14 @@
-use crate::{
-    rank::Rank,
-    select::Select,
-    set::ImpliedSet,
-};
+//! A simple sparse set based on a sorted vector of elements.
 
+use crate::{rank::Rank, select::Select, set::ImpliedSet};
+
+/// A simple sparse set based on an unindexed sorted vector of elements.
 pub struct Sorted {
     elements: Vec<u64>,
 }
 
 impl Sorted {
+    /// Create a new set based on a sorted vector of elements.
     pub fn new(elements: &[u64]) -> Sorted {
         Sorted {
             elements: Vec::from(elements),
@@ -24,7 +24,7 @@ impl ImpliedSet for Sorted {
     fn size(&self) -> u64 {
         match self.elements.last() {
             None => 0,
-            Some(x) => x + 1
+            Some(x) => x + 1,
         }
     }
 }
@@ -96,7 +96,7 @@ mod tests {
         xs.dedup();
         println!("xs={:?}", xs);
 
-        let r = Sorted::new( &xs);
+        let r = Sorted::new(&xs);
         for i in 0..xs.len() {
             let x = xs[i];
             println!("xs[i]={}", x);

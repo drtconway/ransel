@@ -45,6 +45,7 @@ pub mod set;
 pub mod rank;
 pub mod select;
 pub mod sparse;
+pub mod naive_dense;
 pub mod naive_sparse;
 pub mod sorted;
 pub mod intvec;

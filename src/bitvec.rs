@@ -1,6 +1,7 @@
 //! A bit vector represented as a vector of 64 bit words.
 
 /// A bit vector represented by a vector of 64 bit words.
+#[derive(Clone)]
 pub struct BitVec {
     size: usize,
     words: Vec<u64>

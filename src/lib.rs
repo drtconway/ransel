@@ -50,6 +50,8 @@ pub mod naive_sparse;
 pub mod sorted;
 pub mod intvec;
 pub mod bitvec;
+pub mod parens;
 mod persist;
 mod words;
 mod dense64;
+mod ecode;
